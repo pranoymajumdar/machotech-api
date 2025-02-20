@@ -8,9 +8,6 @@ type ValidationSchema = {
   params?: AnyZodObject;
 };
 
-/**
- * Middleware to validate request data against provided schemas
- */
 export const validateRequest = (schemas: ValidationSchema) => {
   return async (
     req: Request,
@@ -48,5 +45,5 @@ export const validateRequest = (schemas: ValidationSchema) => {
   };
 };
 
-// For backward compatibility with your existing code
+
 export const validateCategoryRequest = validateRequest;
