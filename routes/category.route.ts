@@ -277,7 +277,6 @@ router.get(
   tryCatch(async (req: Request, res: Response) => {
     const categoryId = parseInt(req.params.id);
 
-    // First check if category exists
     const categoryExists = await db
       .select()
       .from(category)
@@ -291,19 +290,14 @@ router.get(
       return;
     }
 
-    // Get all products
     const allProducts = await db.select().from(product);
+    const categories = await db.select().from(category);
 
-    // Filter products that have this category ID in their machineData.categories
     const productsInCategory = allProducts.filter(prod => {
       const machineData = prod.machineData as { categories?: number[] } || {};
       return machineData.categories?.includes(categoryId);
     });
 
-    // Get all categories for reference
-    const categories = await db.select().from(category);
-
-    // Map products with their complete category information
     const productsWithCategories = productsInCategory.map(prod => {
       const machineData = prod.machineData as { categories?: number[] } || {};
       const productCategories = categories.filter(cat => 

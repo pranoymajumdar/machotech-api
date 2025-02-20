@@ -1,7 +1,7 @@
 import { Router } from "express";
 import { StatusCodes } from "http-status-codes";
 import { z } from "zod";
-import { eq, sql } from "drizzle-orm";
+import { eq, sql, inArray } from "drizzle-orm";
 import multer from "multer";
 import path from "path";
 import fs from "fs";
@@ -220,9 +220,7 @@ router.get(
       productCategories = await db
         .select()
         .from(category)
-        .where(
-          sql`${category.id} IN (${machineData.categories})`
-        );
+        .where(inArray(category.id, machineData.categories));
     }
 
     const productWithCategories = {
