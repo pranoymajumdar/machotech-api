@@ -10,7 +10,8 @@ import { type Request, type Response } from "express";
 import { db } from "../db";
 import { category } from "../db/schema";
 import { tryCatch } from "../errorHandlers";
-import { validateRequest } from "../middlewares/category.middleware";
+import { validateRequest } from "../middlewares/validate.middleware";
+import { product } from "../db/schema";
 
 // Constants
 const UPLOAD_DIR = path.join(process.cwd(), "uploads");
@@ -134,7 +135,7 @@ router.get(
   "/:id",
   tryCatch(async (req: Request, res: Response) => {
     const id = parseInt(req.params.id);
-
+    console.log(req.params.id);
     if (isNaN(id)) {
       res.status(StatusCodes.BAD_REQUEST).json({
         error: "Invalid category ID format",
@@ -183,7 +184,7 @@ router.put(
 
     if (existingCategory.length === 0) {
       res.status(StatusCodes.NOT_FOUND).json({
-        error: "Category not found",
+        error: "Category not found Bole?",
       });
       return;
     }
@@ -265,6 +266,59 @@ router.delete(
     res.status(StatusCodes.OK).json({
       success: true,
       message: `Successfully deleted '${foundCategory[0].name}'`,
+    });
+  })
+);
+
+
+router.get(
+  "/:id/products",
+  validateRequest({ params: categoryIdSchema }),
+  tryCatch(async (req: Request, res: Response) => {
+    const categoryId = parseInt(req.params.id);
+
+    // First check if category exists
+    const categoryExists = await db
+      .select()
+      .from(category)
+      .where(eq(category.id, categoryId))
+      .limit(1);
+
+    if (categoryExists.length === 0) {
+      res.status(StatusCodes.NOT_FOUND).json({
+        error: "Category not found",
+      });
+      return;
+    }
+
+    // Get all products
+    const allProducts = await db.select().from(product);
+
+    // Filter products that have this category ID in their machineData.categories
+    const productsInCategory = allProducts.filter(prod => {
+      const machineData = prod.machineData as { categories?: number[] } || {};
+      return machineData.categories?.includes(categoryId);
+    });
+
+    // Get all categories for reference
+    const categories = await db.select().from(category);
+
+    // Map products with their complete category information
+    const productsWithCategories = productsInCategory.map(prod => {
+      const machineData = prod.machineData as { categories?: number[] } || {};
+      const productCategories = categories.filter(cat => 
+        machineData.categories?.includes(cat.id)
+      );
+      
+      return {
+        ...prod,
+        categories: productCategories
+      };
+    });
+
+    res.status(StatusCodes.OK).json({
+      category: categoryExists[0],
+      products: productsWithCategories
     });
   })
 );

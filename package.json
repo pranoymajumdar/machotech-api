@@ -4,7 +4,8 @@
   "type": "module",
   "scripts": {
     "dev": "bun --hot --watch index.ts",
-    "db:push": "bunx drizzle-kit push"
+    "db:push": "bunx drizzle-kit push",
+    "db:studio": "bunx drizzle-kit studio"
   },
   "devDependencies": {
     "@types/bun": "latest",
