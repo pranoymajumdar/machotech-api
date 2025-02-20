@@ -44,4 +44,4 @@ app.post('/upload/categories', upload.single('image'), async (req: Request, res:
     fileUrl: fileUrl
   });
 });
-app.listen(process.env.PORT!, () => console.log(`Server started in http://localhost:${process.env.PORT!}/`));
+app.listen(3000, '0.0.0.0', () => console.log(`Server started in http://localhost:3000/`));
