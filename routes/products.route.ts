@@ -1,8 +1,8 @@
 import { Router } from "express";
 import { StatusCodes } from "http-status-codes";
 import { z } from "zod";
-import { eq, sql, inArray } from "drizzle-orm";
-import multer from "multer";
+import { eq, inArray } from "drizzle-orm";
+import multer, { type FileFilterCallback } from "multer";
 import path from "path";
 import fs from "fs";
 import { v4 as uuidv4 } from "uuid";
@@ -11,6 +11,7 @@ import { db } from "../db";
 import { product, category } from "../db/schema";
 import { tryCatch } from "../errorHandlers";
 import { validateRequest } from "../middlewares/validate.middleware";
+import { authenticateToken } from "../middlewares/auth.middleware";
 
 const UPLOAD_DIR = path.join(process.cwd(), "uploads");
 const IMAGE_URL_PREFIX = "/uploads/products";
@@ -33,29 +34,33 @@ const storage = multer.diskStorage({
   },
 });
 
-const upload = multer({
+const fileFilter = (_: Request, file: Express.Multer.File, cb: FileFilterCallback) => {
+  if (!file) {
+    cb(null, true);
+    return;
+  }
+  
+  const allowedTypes = /jpeg|jpg|png|webp/;
+  const extname = allowedTypes.test(
+    path.extname(file.originalname).toLowerCase()
+  );
+  const mimetype = allowedTypes.test(file.mimetype);
+
+  if (extname && mimetype) {
+    cb(null, true);
+  } else {
+    cb(null, false);
+  }
+};
+
+const uploadMiddleware = multer({
   storage,
   limits: { 
     fileSize: 50 * 1024 * 1024,
     files: 10
   },
-  fileFilter: (_, file, cb) => {
-    if (!file) {
-      return cb(null, true);
-    }
-    
-    const allowedTypes = /jpeg|jpg|png|webp/;
-    const extname = allowedTypes.test(
-      path.extname(file.originalname).toLowerCase()
-    );
-    const mimetype = allowedTypes.test(file.mimetype);
-
-    if (extname && mimetype) {
-      return cb(null, true);
-    }
-    cb(null, false);
-  },
-}).array('images', 10);
+  fileFilter
+});
 
 const productBaseSchema = {
   name: z.string().min(3, "Name must be at least 3 characters").max(100),
@@ -81,13 +86,15 @@ const router = Router();
 
 router.post(
   "/",
+  authenticateToken,
   (req: Request, res: Response, next: NextFunction) => {
-    upload(req, res, (err) => {
+    uploadMiddleware.array("images", 10)(req, res, (err: any) => {
       if (err instanceof multer.MulterError) {
         return res.status(StatusCodes.BAD_REQUEST).json({
           error: `Upload error: ${err.message}`
         });
-      } else if (err) {
+      }
+      if (err) {
         return res.status(StatusCodes.INTERNAL_SERVER_ERROR).json({
           error: `Unknown error: ${err.message}`
         });
@@ -234,13 +241,15 @@ router.get(
 
 router.put(
   "/:id",
+  authenticateToken,
   (req: Request, res: Response, next: NextFunction) => {
-    upload(req, res, (err) => {
+    uploadMiddleware.array("images", 10)(req, res, (err: any) => {
       if (err instanceof multer.MulterError) {
         return res.status(StatusCodes.BAD_REQUEST).json({
           error: `Upload error: ${err.message}`
         });
-      } else if (err) {
+      }
+      if (err) {
         return res.status(StatusCodes.INTERNAL_SERVER_ERROR).json({
           error: `Unknown error: ${err.message}`
         });
@@ -336,6 +345,7 @@ router.put(
 
 router.delete(
   "/:id",
+  authenticateToken,
   validateRequest({ params: productIdSchema }),
   tryCatch(async (req: Request, res: Response) => {
     const id = parseInt(req.params.id);
@@ -351,6 +361,23 @@ router.delete(
         error: "Product not found",
       });
       return;
+    }
+
+    const machineData = foundProduct[0].machineData as { images?: string[] } || {};
+    if (machineData.images?.length) {
+      machineData.images.forEach(imageUrl => {
+        try {
+          const imagePath = path.join(
+            process.cwd(),
+            imageUrl.replace(/^\//, '')
+          );
+          if (fs.existsSync(imagePath)) {
+            fs.unlinkSync(imagePath);
+          }
+        } catch (error) {
+          console.error(`Error deleting image: ${imageUrl}`, error);
+        }
+      });
     }
 
     await db.delete(product).where(eq(product.id, id));

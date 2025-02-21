@@ -12,6 +12,7 @@ import { category } from "../db/schema";
 import { tryCatch } from "../errorHandlers";
 import { validateRequest } from "../middlewares/validate.middleware";
 import { product } from "../db/schema";
+import { authenticateToken } from "../middlewares/auth.middleware";
 
 // Constants
 const UPLOAD_DIR = path.join(process.cwd(), "uploads");
@@ -75,11 +76,11 @@ const router = Router();
 // Create a new category
 router.post(
   "/",
+  authenticateToken,
   upload.single("image"),
-  tryCatch(async (req: Request, res: Response) => {
+  tryCatch(async (req: Request, res: Response): Promise<void> => {
     const { name, description } = req.body;
 
-    // Validate required fields
     if (!name || !description) {
       res.status(StatusCodes.BAD_REQUEST).json({
         error: "Name and description are required",
@@ -163,6 +164,7 @@ router.get(
 // Update category
 router.put(
   "/:id",
+  authenticateToken,
   upload.single("image"),
   tryCatch(async (req: Request, res: Response) => {
     const id = parseInt(req.params.id);
@@ -228,6 +230,7 @@ router.put(
 // Delete category
 router.delete(
   "/:id",
+  authenticateToken,
   validateRequest({ params: categoryIdSchema }),
   tryCatch(async (req: Request, res: Response) => {
     const id = parseInt(req.params.id);
@@ -245,12 +248,11 @@ router.delete(
       return;
     }
 
-    // Delete associated image if exists
     if (foundCategory[0].imageUrl) {
       try {
         const imagePath = path.join(
           process.cwd(),
-          foundCategory[0].imageUrl.replace(/^\//, "")
+          foundCategory[0].imageUrl.replace(/^\//, '')
         );
         if (fs.existsSync(imagePath)) {
           fs.unlinkSync(imagePath);
@@ -260,12 +262,11 @@ router.delete(
       }
     }
 
-    // Delete the category
     await db.delete(category).where(eq(category.id, id));
 
     res.status(StatusCodes.OK).json({
       success: true,
-      message: `Successfully deleted '${foundCategory[0].name}'`,
+      message: `Successfully deleted '${foundCategory[0].name}'`
     });
   })
 );

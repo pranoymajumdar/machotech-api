@@ -4,6 +4,7 @@ import multer from "multer";
 import path from "path";
 import cors from 'cors';
 import { productsRouter } from "./routes/products.route";
+import { authRouter } from "./routes/auth.route";
 // Fix the storage path
 const uploadDir = path.join(__dirname, 'uploads/categories');
 const storage = multer.diskStorage({
@@ -28,6 +29,7 @@ app.use('/uploads', Express.static(path.join(__dirname, 'uploads')));
 
 app.use('/categories', categoriesRouter);
 app.use('/products', productsRouter);
+app.use("/auth", authRouter);
 
 app.post('/upload/categories', upload.single('image'), async (req: Request, res: Response) => {
   if (!req.file) {
